@@ -75,6 +75,21 @@ Design rationale:
 - **Cross-city rules**: Monitoring only city-local anomalies makes the system look like three independent weather feeds. Cross-city rules add national situational awareness by surfacing large thermal spreads and synchronized storm-like conditions. This provides macro insight that single-city thresholds cannot express.
 - **Multi-variable rules**: Many impactful conditions are compound, not single-signal. Snow with strong wind is operationally different from snow alone; a large apparent-vs-air temperature gap indicates human-impact stress that dry-bulb temperature alone hides. Combining variables improves practical relevance and reduces false significance from one noisy field.
 
+### Sensitivity vs Noise Tradeoff
+
+This detector intentionally favors **selective, explainable events** over maximum firing rate.
+
+- **Anti-noise controls**:
+  - detection runs only on newly inserted timestamps (no duplicate-poll events)
+  - transition-based WMO events fire on code changes, not repeated identical severe codes
+  - cross-city rules require aligned timestamps across all three cities
+- **Sensitivity controls**:
+  - rate-of-change rules capture abrupt hazards that static thresholds miss
+  - city-specific thresholds preserve local relevance instead of one-size-fits-all triggering
+  - compound-variable rules capture practical risk states from multiple signals
+
+The unit tests include both trigger and near-miss scenarios so threshold choices remain auditable and adjustable.
+
 ## API Reference
 
 Base URL (local): `http://localhost:8000`
@@ -146,6 +161,13 @@ cp .env.example .env
 docker compose up --build
 ```
 
+On Windows PowerShell, use:
+
+```powershell
+Copy-Item .env.example .env
+docker compose up --build
+```
+
 The API will be available at `http://localhost:8000`.
 
 ### Example curl commands
@@ -172,7 +194,7 @@ Defined in `.env.example`:
 - `POLL_MAX_RETRIES`
 - `LOG_LEVEL`
 
-No API key is required for Open-Meteo as it is open-source.
+No API key is required for Open-Meteo.
 
 ## Testing
 
