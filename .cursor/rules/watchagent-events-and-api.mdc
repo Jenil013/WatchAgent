@@ -1,0 +1,64 @@
+---
+description: Notable event records, detection boundaries, and HTTP API contracts
+globs: "**/*.py"
+alwaysApply: true
+---
+
+# Notable events
+
+An event is **not** a raw reading. Detection logic lives in dedicated code (e.g. `events/` or `detection/`), called only after a **new** reading is stored.
+
+## Event record (minimum fields)
+
+Every stored event must answer: **what happened**, **which city**, **when**, and **why it was notable**.
+
+| Field | Purpose |
+|-------|---------|
+| `city` | `Ottawa` \| `Toronto` \| `Vancouver` |
+| `occurred_at` | ISO timestamp aligned with the triggering reading |
+| `event_type` | Stable machine id (e.g. `temp_delta_spike`, `cross_city_gap`) |
+| `summary` | Short human-readable description |
+| `reason` | One or two sentences tying the rule to the data (graded in README) |
+| `details` | JSON/dict: metrics used (deltas, thresholds, peer city, WMO code, etc.) |
+
+Prefer **context-aware** rules (recent history, city baselines, cross-city comparison) over single static thresholds. Balance sensitivity vs noise; document tradeoffs in README and back them with unit tests.
+
+## Detection tests
+
+Given a **constructed sequence** of readings (no live API):
+
+- Assert expected `event_type`(s) fire.
+- Assert false positives do **not** fire.
+- Tests are the source of truth for README claims about event design.
+
+# HTTP API (exact contracts)
+
+Implement in Python; serve on port **8000** in Docker. Response shapes must match exactly:
+
+**GET /health** → 200
+
+```json
+{ "status": "ok", "readings_stored": <int>, "events_stored": <int> }
+```
+
+**GET /readings?city=Ottawa&limit=50** → 200
+
+```json
+{ "readings": [ { /* all stored reading columns */ } ] }
+```
+
+- `city`: optional filter
+- `limit`: optional, default `50`, most recent first
+
+**GET /events?city=Ottawa&limit=50** → 200
+
+```json
+{ "events": [ { /* all stored event columns */ } ] }
+```
+
+Same query semantics as readings. API shape tests must seed the DB and assert keys, types, and ordering—not live weather.
+
+## Repo hygiene
+
+- Document env vars in `.env.example` only; never commit secrets.
+- CI: unit tests job + `docker build` on push to `main`; weather calls mocked in tests.

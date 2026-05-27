@@ -1,0 +1,58 @@
+---
+description: Open-Meteo poller, deduplication, and failure handling for WatchAgent
+globs: "**/*.py"
+alwaysApply: true
+---
+
+# Weather poller (Open-Meteo)
+
+## Cities (fixed)
+
+Monitor exactly these three cities with these coordinates:
+
+| City      | latitude   | longitude   |
+|-----------|------------|-------------|
+| Ottawa    | 45.4112    | -75.6981    |
+| Toronto   | 43.7064    | -79.3986    |
+| Vancouver | 49.2497    | -123.1193   |
+
+Store the display name as `Ottawa`, `Toronto`, or `Vancouver` (challenge API filters use these strings).
+
+## Fetch contract
+
+Use Open-Meteo forecast `current` only (no API key):
+
+```
+GET https://api.open-meteo.com/v1/forecast
+  ?latitude={lat}&longitude={lon}
+  &current=temperature_2m,apparent_temperature,precipitation,wind_speed_10m,weather_code
+  &wind_speed_unit=kmh&timezone=auto
+```
+
+Persist from `response["current"]`: `time`, `temperature_2m`, `apparent_temperature`, `precipitation`, `wind_speed_10m`, `weather_code`.
+
+## Deduplication (required)
+
+Open-Meteo updates hourly; the poller runs more often. **Insert a reading only when `current.time` differs from the latest stored timestamp for that city.** Duplicate polls with the same timestamp must not create a second row.
+
+```python
+# ✅ Correct: gate on timestamp per city
+if reading_time <= latest_stored_time_for_city:
+    return  # skip insert and event detection for this poll
+
+# ❌ Wrong: insert on every successful HTTP response
+```
+
+## Poll failures
+
+When a fetch fails (timeout, non-2xx, parse error):
+
+- Log at **WARNING** with: `city`, `http_status` (or `"none"`), `retry_count`, and a short `error` message.
+- **Do not raise** out of the poller loop; schedule the next poll.
+- Do not write a reading or run event detection for that failed poll.
+
+Use structured logging (e.g. `logging` extra fields or JSON) so failures are grep-friendly in Docker logs.
+
+## Tests
+
+Any test that hits Open-Meteo must **mock** the HTTP client. Include a deduplication test: same `current.time` twice → exactly one row in storage.
