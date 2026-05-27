@@ -1,4 +1,4 @@
-# uWatchAgent: Weather Monitor & AI Assistant
+# WatchAgent: Weather Monitor & AI Assistant
 
 WatchAgent monitors live weather for three Canadian cities, stores deduplicated readings, detects notable events, and exposes data through a FastAPI HTTP API.
 
