@@ -1,4 +1,7 @@
+name: watch-agent
+
 services:
+  
   api:
     build: .
     container_name: watchagent-api
