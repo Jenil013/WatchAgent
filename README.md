@@ -155,7 +155,7 @@ Response shape:
 From a clean clone:
 
 ```bash
-git clone <your-repo>
+git clone https://github.com/Jenil013/WatchAgent
 cd WatchAgent
 cp .env.example .env
 docker compose up --build
