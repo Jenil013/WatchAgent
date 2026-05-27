@@ -70,7 +70,7 @@ def init_db(conn: sqlite3.Connection) -> None:
             event_type TEXT NOT NULL,
             summary TEXT NOT NULL,
             reason TEXT NOT NULL,
-            details_json TEXT NOT NULL,
+            details TEXT NOT NULL,
             created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
         )
         """
@@ -166,7 +166,7 @@ def insert_events(conn: sqlite3.Connection, events: Iterable[Event]) -> int:
         return 0
     conn.executemany(
         """
-        INSERT INTO events (city, occurred_at, event_type, summary, reason, details_json)
+        INSERT INTO events (city, occurred_at, event_type, summary, reason, details)
         VALUES (?, ?, ?, ?, ?, ?)
         """,
         rows,
@@ -207,7 +207,7 @@ def list_events(conn: sqlite3.Connection, city: Optional[str], limit: int) -> li
     if city:
         rows = conn.execute(
             """
-            SELECT id, city, occurred_at, event_type, summary, reason, details_json
+            SELECT id, city, occurred_at, event_type, summary, reason, details
             FROM events
             WHERE city = ?
             ORDER BY occurred_at DESC, id DESC
@@ -218,7 +218,7 @@ def list_events(conn: sqlite3.Connection, city: Optional[str], limit: int) -> li
     else:
         rows = conn.execute(
             """
-            SELECT id, city, occurred_at, event_type, summary, reason, details_json
+            SELECT id, city, occurred_at, event_type, summary, reason, details
             FROM events
             ORDER BY occurred_at DESC, id DESC
             LIMIT ?
@@ -231,11 +231,45 @@ def list_events(conn: sqlite3.Connection, city: Optional[str], limit: int) -> li
     for r in rows:
         d = dict(r)
         try:
-            d["details"] = json.loads(d.pop("details_json"))
+            d["details"] = json.loads(d["details"])
         except Exception:
-            d["details"] = {"raw": d.get("details_json")}
+            d["details"] = {"raw": d.get("details")}
         out.append(d)
     return out
+
+
+def get_previous_reading(conn: sqlite3.Connection, city: str, before_time: str) -> Optional[dict[str, Any]]:
+    row = conn.execute(
+        """
+        SELECT id, city, recorded_at, temperature_2m, apparent_temperature,
+               precipitation, wind_speed_10m, weather_code
+        FROM readings
+        WHERE city = ? AND recorded_at < ?
+        ORDER BY recorded_at DESC
+        LIMIT 1
+        """,
+        (city, before_time),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def get_latest_reading_per_city(conn: sqlite3.Connection) -> dict[str, dict[str, Any]]:
+    latest: dict[str, dict[str, Any]] = {}
+    for city in CITIES:
+        row = conn.execute(
+            """
+            SELECT id, city, recorded_at, temperature_2m, apparent_temperature,
+                   precipitation, wind_speed_10m, weather_code
+            FROM readings
+            WHERE city = ?
+            ORDER BY recorded_at DESC
+            LIMIT 1
+            """,
+            (city,),
+        ).fetchone()
+        if row:
+            latest[city] = dict(row)
+    return latest
 
 
 def count_readings(conn: sqlite3.Connection) -> int:

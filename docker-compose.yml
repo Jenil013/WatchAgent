@@ -1,0 +1,30 @@
+services:
+  api:
+    build: .
+    container_name: watchagent-api
+    command: uvicorn app.app:app --host 0.0.0.0 --port 8000
+    env_file:
+      - .env
+    environment:
+      WATCHAGENT_DB_PATH: /app/data/watchagent.db
+    ports:
+      - "8000:8000"
+    volumes:
+      - watchagent_data:/app/data
+    restart: unless-stopped
+
+  poller:
+    build: .
+    container_name: watchagent-poller
+    command: python -m app.poller
+    env_file:
+      - .env
+    environment:
+      WATCHAGENT_DB_PATH: /app/data/watchagent.db
+    volumes:
+      - watchagent_data:/app/data
+    restart: unless-stopped
+
+volumes:
+  watchagent_data:
+

@@ -1,0 +1,2 @@
+"""Notable event detection package."""
+
